@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rover Control</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #121212;
+            color: #00ff00;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #ffffff;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 255, 0, 0.1);
+        }
+
+        .value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-top: 10px;
+            color: #00ff00;
+        }
+
+        .status-dot {
+            height: 15px;
+            width: 15px;
+            background-color: red;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+        }
+
+        .Connected {
+            background-color: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        .controls {
+            grid-column: span 2;
+            font-size: 0.9em;
+            color: #888;
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .ip-config {
+            margin-bottom: 20px;
+            background: #1e1e1e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: inline-block;
+        }
+
+        input[type="text"] {
+            background: #333;
+            border: 1px solid #555;
+            color: #00ff00;
+            padding: 5px;
+            font-family: 'Courier New';
+            font-size: 1em;
+            text-align: center;
+        }
+
+        button {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 6px 15px;
+            cursor: pointer;
+            font-family: 'Courier New';
+            font-weight: bold;
+        }
+
+        button:hover {
+            background: #666;
+        }
+
+        .alert {
+            color: #ff3333;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Lego Technic Rover</h1>
+
+
+    <p><span id="status-dot" class="status-dot"></span><span id="status-text">DISCONNECTED</span></p>
+
+    <div class="dashboard">
+        <div class="card">
+            <div>CURRENT MOVEMENT</div>
+            <div id="dir-val" class="value">STOP</div>
+        </div>
+
+        <div class="card" style="border-color: #00ccff;">
+            <div style="color: #00ccff;">LASER DISTANCE</div>
+            <div id="dist-val" class="value" style="color: #00ccff;">--- mm</div>
+        </div>
+
+        <div class="controls">
+            <strong>DRIVING CONTROL:</strong> <br>
+            [W] Forward | [S] Backward | [A] Left | [D] Right<br><br>
+            <strong>SERVO CONTROL:</strong><br>
+            [Q] Turn left | [E] Turn right
+        </div>
+    </div>
+
+    <script>
+        let ws;
+        const moveKeys = ['w', 's', 'a', 'd'];
+        const servoKeys = ['q', 'e'];
+        const RobotIP = "192.168.100.136"; // M
+
+        window.onload = () => {
+            connect(RobotIP);
+        };
+
+        function connect(ip) {
+            ws = new WebSocket(`ws://${ip}:81/`);
+
+            ws.onopen = () => {
+                document.getElementById('status-text').innerText = "CONNECTED";
+                document.getElementById('status-dot').classList.add('Connected');
+            };
+
+            ws.onclose = () => {
+                document.getElementById('status-text').innerText = "DISCONNECTED";
+                document.getElementById('status-dot').classList.remove('Connected');
+                document.getElementById('dist-val').innerText = "---";
+            };
+
+            ws.onmessage = (event) => {
+                let data = event.data.split(',');
+
+                if (data.length === 2) {
+                    document.getElementById('dir-val').innerText = data[0];
+                    let dystans = parseInt(data[1]);
+                    if (dystans > 8000) {
+                        document.getElementById('dist-val').innerText = "Error/Out of range";
+                        document.getElementById('dist-val').classList.add('alert');
+                    } else {
+                        document.getElementById('dist-val').innerText = dystans + ' mm';
+                        document.getElementById('dist-val').classList.remove('alert');
+                    }
+                }
+            };
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (document.activeElement.tagName === "INPUT") return;
+            if (event.repeat || !ws || ws.readyState !== WebSocket.OPEN) return;
+
+            let key = event.key.toLowerCase();
+
+            if (key === 'w') ws.send('Forward');
+            if (key === 's') ws.send('Backward');
+            if (key === 'a') ws.send('Left');
+            if (key === 'd') ws.send('Right');
+            if (key === 'q') ws.send('ServoLeft');
+            if (key === 'e') ws.send('ServoRight');
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (document.activeElement.tagName === "INPUT") return;
+            let key = event.key.toLowerCase();
+            if (moveKeys.includes(key) && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('Stop');
+            }
+            if ((key === 'q' || key === 'e') && ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('ServoStop');
+            }
+        });
+    </script>
+</body>
+
+</html>
