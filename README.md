@@ -1,30 +1,81 @@
-# ESP32-S3 W.A.L.L.-E (Advanced Robotics Project)
+# MORPh — Modular Optical Rover Platform
 
-## Hardware Setup
-The main board was designed with noise isolation and logic safety in mind:
-* **Brain:** ESP32-S3 DevKitC-1.
-* **Drive:** JGB37 DC motors controlled by a TB6612FNG H-bridge.
-* **Articulations:** 7x MG90S (Metal Gear) servos for head and arm movements, driven by an external PCA9685 controller (I2C).
-* **Audio System:** MAX98357A I2S digital amplifier with a 3W 4Ohm speaker, playing MP3 sounds.
-* **Power & Safety:** Custom 2S (7.4V) 18650 battery pack with a BMS and USB-C charging module. Logic (5V) and servos are separated using two independent step-down converters (LM2596 and XL4015). Current and voltage are monitored in real-time by an INA219 sensor (I2C).
+**MORPh** is a modular 2D space-mapping robot built with **Lego Technic** and powered by an **ESP32-S3** microcontroller. Equipped with a rotating **VL53L1X Time-of-Flight (ToF)** laser distance sensor and a real-time **WebSocket** control dashboard, the rover is designed for indoor obstacle detection, telemetry streaming, and 2D spatial mapping.
+
+---
+
+## Hardware Architecture
+
+* **Microcontroller:** ESP32-S3 DevKit
+* **Optical Distance Sensor:** VL53L1X ToF Laser
+* **Drive System:** 2× N20 DC Micro Gear Motors
+* **Motor Driver:** H-Bridge (TB6612FNG)
+* **Scanner Turret:** 360° Continuous Rotation Servo
+* **Power System:** 2× 18650 Li-Ion Battery Pack (7.4V nominal / 8.4V max) + DC-DC Step-Down Converter
+* **Chassis:** Modular Lego Technic frame
+
+---
 
 ## ESP32-S3 Pinout
 
-| Module | Signal | ESP32-S3 Pin |
-| :--- | :--- | :--- |
-| **I2C Bus** (PCA9685, INA219) | SDA <br> SCL | 21 <br> 47 |
-| **Audio I2S** (MAX98357A) | DIN <br> BCLK <br> LRC | 14 <br> 19 <br> 20 |
-| **Motor A** (TB6612FNG) | PWMA <br> AN1 <br> AN2 | 3 <br> 41 <br> 46 |
-| **Motor B** (TB6612FNG) | PWMB <br> BN1 <br> BN2 | 1 <br> 42 <br> 2 |
-| **SD Card** | SD_DATA <br> SD_CLK <br> SD_CMD | 40 <br> 39 <br> 38 |
+| Peripheral / Module | Module Pin | ESP32-S3 Pin | Function |
+| :--- | :--- | :--- | :--- |
+| **H-Bridge (Motor A - Left)** | `PWMA` | **GPIO 5** | PWM Speed Control (Channel A) |
+| **H-Bridge (Motor A - Left)** | `AIN1` | **GPIO 4** | Direction Control Input 1 |
+| **H-Bridge (Motor A - Left)** | `AIN2` | **GPIO 7** | Direction Control Input 2 |
+| **H-Bridge (Motor B - Right)** | `PWMB` | **GPIO 17** | PWM Speed Control (Channel B) |
+| **H-Bridge (Motor B - Right)** | `BIN1` | **GPIO 15** | Direction Control Input 1 |
+| **H-Bridge (Motor B - Right)** | `BIN2` | **GPIO 16** | Direction Control Input 2 |
+| **H-Bridge (Control)** | `STBY` | **3V3** | Driver Enable (pulled HIGH) |
+| **360° Scanner Servo** | `PWM` | **GPIO 14** | 50 Hz Servo Control Signal |
+| **VL53L1X ToF Sensor** | `SDA` | **GPIO 2** | I2C Data Line |
+| **VL53L1X ToF Sensor** | `SCL` | **GPIO 1** | I2C Clock Line |
+| **VL53L1X ToF Sensor** | `VIN` / `GND` | **3V3** / **GND** | Sensor Power Supply |
 
-## Software Architecture
-*(Work in progress - pending Object-Oriented Programming refactoring)*
+---
+
+## WebSocket Dashboard & Controls
+
+The ESP32-S3 hosts a WebSocket server on **port `81`**, streaming telemetry packets (`Action,Distance`) every `150 ms` to `index.html`.
+
+* **Rover Driving:**
+  * `[W]` — Move Forward
+  * `[S]` — Move Backward
+  * `[A]` — Turn Left
+  * `[D]` — Turn Right
+* **Scanner Turret:**
+  * `[Q]` — Step / Rotate Left
+  * `[E]` — Step / Rotate Right
+
+---
+
+## Getting Started
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/Mgorniak05/MORPh.git](https://github.com/Mgorniak05/MORPh.git)
+   cd MORPh
+
+2. **Configure Wi-Fi credentials:**
+   Create an `include/secrets.h` file (ignored by Git) with your network details:
+   ```cpp
+   #pragma once
+   #define WIFI_SSID "YOUR_WIFI_SSID"
+   #define WIFI_PASSWORD "YOUR_WIFI_PASSWORD"
+   ```
+
+3. **Build and upload firmware:**
+   Open the project in **VS Code + PlatformIO**, connect the ESP32-S3 via the **COM (UART)** port, and upload the firmware.
+
+4. **Launch the control panel:**
+   Check the assigned IP address in the Serial Monitor (`115200 baud`), update `RobotIP` in `index.html` if needed, and open `index.html` in your browser.
+
+---
 
 ## Roadmap
-- [x] Custom baseboard design and soldering.
-- [x] I2C bus initialization and power monitoring tests.
-- [x] LittleFS filesystem and I2S audio integration.
-- [x] 3D printing of the chassis, tracks, and mechanical assembly.
-- [ ] Code refactoring to clean OOP (Object-Oriented Programming).
-- [ ] Creating and tuning servo animations.
+
+- [x] Differential drive control via H-Bridge & WebSockets
+- [x] Non-blocking 360° servo stepping control
+- [x] VL53L1X ToF integration with narrowed 15° ROI (`4x4`)
+- [ ] Real-time 2D radar visualization in the web dashboard
+- [ ] Automated 360° room sweep & 2D obstacle point-cloud mapping
