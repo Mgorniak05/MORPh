@@ -6,6 +6,7 @@
 #include <VL53L1X.h>
 #include "MotorController.h"
 #include "secrets.h"
+#include "Filters.h"
 
 #define PWMA 5
 #define AIN1 4
@@ -26,6 +27,8 @@ VL53L1X tofSensor;
 int currentSpeed = 80;
 String currentAction = "STOP";
 int distance = 0;
+int rawDistance = 0;
+DistanceFilter tofFilter;
 bool isSensorReady = false;
 unsigned long servoStartTime = 0;
 bool isServoStepping = false;
@@ -117,9 +120,9 @@ void setup()
   {
     isSensorReady = true;
     tofSensor.setDistanceMode(VL53L1X::Long);
-    tofSensor.setROISize(4, 4);
-    tofSensor.setMeasurementTimingBudget(50000);
-    tofSensor.startContinuous(50);
+    tofSensor.setROISize(8, 8);
+    tofSensor.setMeasurementTimingBudget(140000);
+    tofSensor.startContinuous(150);
     Serial.println("Sensor initialized successfully!");
   }
   else
@@ -148,7 +151,10 @@ void loop()
 
   if (isSensorReady && tofSensor.dataReady())
   {
-    distance = tofSensor.read(false);
+    rawDistance = tofSensor.read(false);
+    if (tofSensor.ranging_data.range_status == 0){
+      distance = tofFilter.processDistance(rawDistance);
+    }
   }
 
   if (isServoStepping && (millis() - servoStartTime >= 4635)) //  37 ,  4632
