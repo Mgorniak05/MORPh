@@ -120,9 +120,11 @@ void setup()
   {
     isSensorReady = true;
     tofSensor.setDistanceMode(VL53L1X::Long);
-    tofSensor.setROISize(8, 8);
-    tofSensor.setMeasurementTimingBudget(140000);
-    tofSensor.startContinuous(150);
+    tofSensor.setROISize(16, 14);
+    tofSensor.setROICenter(199);
+    tofSensor.writeReg16Bit(VL53L1X::RANGE_CONFIG__MIN_COUNT_RATE_RTN_LIMIT_MCPS, 45);
+    tofSensor.setMeasurementTimingBudget(220000);
+    tofSensor.startContinuous(230);
     Serial.println("Sensor initialized successfully!");
   }
   else
@@ -152,8 +154,18 @@ void loop()
   if (isSensorReady && tofSensor.dataReady())
   {
     rawDistance = tofSensor.read(false);
-    if (tofSensor.ranging_data.range_status == 0){
+    Serial.printf("RAW:%4d | st:%d | SIG:%.2f | AMB:%.2f\n",
+                  rawDistance,
+                  tofSensor.ranging_data.range_status,
+                  tofSensor.ranging_data.peak_signal_count_rate_MCPS,
+                  tofSensor.ranging_data.ambient_count_rate_MCPS);
+    if (tofSensor.ranging_data.range_status != 4 && tofSensor.ranging_data.range_status != 5 && tofSensor.ranging_data.peak_signal_count_rate_MCPS >= 0.12f && rawDistance < 4000)
+    {
       distance = tofFilter.processDistance(rawDistance);
+    }
+    else if (tofSensor.ranging_data.range_status == 4 || rawDistance > 4000)
+    {
+      distance = 4000;
     }
   }
 
