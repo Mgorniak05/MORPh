@@ -125,14 +125,14 @@
             <strong>DRIVING CONTROL:</strong> <br>
             [W] Forward | [S] Backward | [A] Left | [D] Right<br><br>
             <strong>SERVO CONTROL:</strong><br>
-            [Q] Turn left | [E] Turn right
+            [Q] Turn left | [E] Turn right | [X] Stop servo | [Z] Find zero position
         </div>
     </div>
 
     <script>
         let ws;
         const moveKeys = ['w', 's', 'a', 'd'];
-        const servoKeys = ['q', 'e'];
+        const servoKeys = ['q', 'e', 'x', 'z'];
         const RobotIP = "192.168.100.136"; // M
 
         window.onload = () => {
@@ -182,6 +182,8 @@
             if (key === 'd') ws.send('Right');
             if (key === 'q') ws.send('ServoLeft');
             if (key === 'e') ws.send('ServoRight');
+            if (key === 'x') ws.send('ServoStop');
+            if (key === 'z') ws.send('FindZero');
         });
 
         document.addEventListener('keyup', (event) => {

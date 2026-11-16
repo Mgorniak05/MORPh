@@ -32,8 +32,27 @@ DistanceFilter tofFilter;
 bool isSensorReady = false;
 unsigned long servoStartTime = 0;
 bool isServoStepping = false;
+bool isFindingZero = false;
 
 const int SERVO_STOP = 94;
+
+void setFastSensor()
+{
+  if (!isSensorReady)
+    return;
+  tofSensor.stopContinuous();
+  tofSensor.setMeasurementTimingBudget(33000);
+  tofSensor.startContinuous(35);
+}
+
+void setNormalSensor()
+{
+  if (!isSensorReady)
+    return;
+  tofSensor.stopContinuous();
+  tofSensor.setMeasurementTimingBudget(220000);
+  tofSensor.startContinuous(230);
+}
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
 {
@@ -85,18 +104,35 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
       radarServo.write(98); // q
       servoStartTime = millis();
       isServoStepping = true;
+      if (isFindingZero)
+        setNormalSensor();
+      isFindingZero = false;
     }
     else if (command == "ServoRight")
     {
       radarServo.write(91); // e
       servoStartTime = millis();
       isServoStepping = true;
+      if (isFindingZero)
+        setNormalSensor();
+      isFindingZero = false;
+    }
+    else if (command == "FindZero")
+    {
+      isFindingZero = true;
+      setFastSensor();
+      radarServo.write(98);
+      servoStartTime = millis();
+      isServoStepping = false;
     }
     else if (command == "ServoStop")
     {
       radarServo.write(SERVO_STOP);
       servoStartTime = millis();
       isServoStepping = false;
+      if (isFindingZero)
+        setNormalSensor();
+      isFindingZero = false;
     }
     break;
   }
@@ -122,7 +158,7 @@ void setup()
     tofSensor.setDistanceMode(VL53L1X::Long);
     tofSensor.setROISize(16, 14);
     tofSensor.setROICenter(199);
-    tofSensor.writeReg16Bit(VL53L1X::RANGE_CONFIG__MIN_COUNT_RATE_RTN_LIMIT_MCPS, 45);
+    tofSensor.writeReg16Bit(VL53L1X::RANGE_CONFIG__MIN_COUNT_RATE_RTN_LIMIT_MCPS, 15);
     tofSensor.setMeasurementTimingBudget(220000);
     tofSensor.startContinuous(230);
     Serial.println("Sensor initialized successfully!");
@@ -159,14 +195,28 @@ void loop()
                   tofSensor.ranging_data.range_status,
                   tofSensor.ranging_data.peak_signal_count_rate_MCPS,
                   tofSensor.ranging_data.ambient_count_rate_MCPS);
-    if (tofSensor.ranging_data.range_status != 4 && tofSensor.ranging_data.range_status != 5 && tofSensor.ranging_data.peak_signal_count_rate_MCPS >= 0.12f && rawDistance < 4000)
+    if (tofSensor.ranging_data.range_status != 4 && tofSensor.ranging_data.range_status != 5 && tofSensor.ranging_data.peak_signal_count_rate_MCPS >= 0.12f && rawDistance < 4000 && !isFindingZero)
     {
       distance = tofFilter.processDistance(rawDistance);
     }
     else if (tofSensor.ranging_data.range_status == 4 || rawDistance > 4000)
     {
-      distance = 4000;
+      distance = 8191;
     }
+    if (isFindingZero && (rawDistance > 20 && rawDistance < 150) && (millis() - servoStartTime > 250))
+    {
+      radarServo.write(SERVO_STOP);
+      setNormalSensor();
+      isFindingZero = false;
+      Serial.println("Zero found");
+    }
+  }
+  if (isFindingZero && (millis() - servoStartTime >= 4645))
+  {
+    radarServo.write(SERVO_STOP);
+    setNormalSensor();
+    isFindingZero = false;
+    Serial.println("Timeout");
   }
 
   if (isServoStepping && (millis() - servoStartTime >= 4635)) //  37 ,  4632
